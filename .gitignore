@@ -1,0 +1,9 @@
+.vercel/
+__pycache__/
+*.pyc
+*.bak*
+*.db
+.DS_Store
+Thumbs.db
+
+.vercel

@@ -1,0 +1,11 @@
+{
+  "version": 2,
+  "name": "omni-clockify",
+  "cleanUrls": true,
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
+}

@@ -1,0 +1,1204 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Clockify — Rastreador de Tempo e Horas por Projeto</title>
+  <style>
+    :root {
+      --clockify-blue: #03a9f4;
+      --clockify-blue-dark: #0288d1;
+      --clockify-red: #f44336;
+      --clockify-green: #4caf50;
+      --bg-page: #f2f6f8;
+      --bg-white: #ffffff;
+      --sidebar-bg: #ffffff;
+      --border: #dce4ec;
+      --text-main: #333333;
+      --text-muted: #7f8fa4;
+      --header-bg: #ffffff;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; }
+    body { background: var(--bg-page); color: var(--text-main); display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+
+    /* TOP NAVBAR ESTILO CLOCKIFY */
+    .topbar {
+      height: 52px;
+      background: var(--header-bg);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 20px;
+      z-index: 20;
+    }
+    .logo-wrap { display: flex; align-items: center; gap: 10px; font-weight: 800; font-size: 1.25rem; color: #263238; }
+    .logo-icon {
+      width: 28px; height: 28px; border-radius: 50%;
+      border: 4px solid var(--clockify-blue);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.75rem; color: var(--clockify-blue); font-weight: 900;
+    }
+    .workspace-badge {
+      background: #e1f5fe; color: var(--clockify-blue-dark);
+      padding: 4px 12px; border-radius: 99px; font-size: 0.8rem; font-weight: 600;
+    }
+
+    /* LAYOUT PRINCIPAL: SIDEBAR + CONTEUDO */
+    .app-layout { display: flex; flex: 1; overflow: hidden; }
+
+    /* MENU LATERAL ESQUERDO ESTILO CLOCKIFY */
+    .sidebar {
+      width: 210px;
+      background: var(--sidebar-bg);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      padding: 12px 0;
+      overflow-y: auto;
+    }
+    .nav-section-label {
+      font-size: 0.7rem;
+      font-weight: 700;
+      color: var(--text-muted);
+      padding: 14px 20px 6px;
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+    }
+    .nav-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 11px 20px;
+      color: #546e7a;
+      font-size: 0.88rem;
+      font-weight: 600;
+      cursor: pointer;
+      border-left: 4px solid transparent;
+      transition: 0.15s;
+      user-select: none;
+    }
+    .nav-item:hover { background: #f5f9fc; color: var(--clockify-blue); }
+    .nav-item.active {
+      background: #e1f5fe;
+      color: var(--clockify-blue-dark);
+      border-left-color: var(--clockify-blue);
+    }
+
+    /* AREA PRINCIPAL */
+    .main-area {
+      flex: 1;
+      overflow-y: auto;
+      padding: 24px 32px;
+    }
+
+    /* BARRA DE RASTREADOR DE TEMPO DO CLOCKIFY */
+    .tracker-bar {
+      background: var(--bg-white);
+      border: 1px solid var(--border);
+      box-shadow: 0 2px 6px rgba(0,0,0,0.04);
+      border-radius: 4px;
+      padding: 10px 16px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 24px;
+      flex-wrap: wrap;
+    }
+    .tracker-input {
+      flex: 1;
+      min-width: 220px;
+      border: 1px solid transparent;
+      padding: 10px 12px;
+      font-size: 0.95rem;
+      border-radius: 4px;
+      outline: none;
+    }
+    .tracker-input:focus { border-color: var(--clockify-blue); background: #fafdff; }
+
+    select, input[type="text"], input[type="number"], input[type="date"], input[type="time"], input[type="email"] {
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 8px 10px;
+      font-size: 0.88rem;
+      color: var(--text-main);
+      background: #fff;
+      outline: none;
+    }
+    select:focus, input:focus { border-color: var(--clockify-blue); }
+
+    .billable-btn {
+      font-size: 1.2rem;
+      font-weight: 700;
+      color: #b0bec5;
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      padding: 6px 10px;
+      border-radius: 4px;
+    }
+    .billable-btn.active { color: var(--clockify-blue); background: #e1f5fe; }
+
+    .clock-display {
+      font-size: 1.35rem;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+      color: #263238;
+      min-width: 95px;
+      text-align: center;
+    }
+
+    .btn-clockify {
+      background: var(--clockify-blue);
+      color: #fff;
+      border: none;
+      padding: 11px 24px;
+      font-weight: 700;
+      font-size: 0.85rem;
+      letter-spacing: 0.5px;
+      border-radius: 4px;
+      cursor: pointer;
+      text-transform: uppercase;
+      transition: 0.15s;
+    }
+    .btn-clockify:hover { background: var(--clockify-blue-dark); }
+    .btn-clockify.stop { background: var(--clockify-red); }
+    .btn-clockify.stop:hover { background: #d32f2f; }
+
+    .btn-mode-toggle {
+      background: #f5f9fc;
+      border: 1px solid var(--border);
+      padding: 6px 10px;
+      font-size: 0.78rem;
+      cursor: pointer;
+      border-radius: 4px;
+      color: #546e7a;
+      font-weight: 600;
+    }
+    .btn-mode-toggle.active { background: var(--clockify-blue); color: #fff; border-color: var(--clockify-blue); }
+
+    /* AGRUPAMENTO DE ENTRADAS POR DIA ESTILO CLOCKIFY */
+    .day-group {
+      background: var(--bg-white);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      margin-bottom: 18px;
+      overflow: hidden;
+    }
+    .day-header {
+      background: #e4eaee;
+      padding: 10px 18px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.85rem;
+      color: #546e7a;
+      font-weight: 600;
+    }
+    .entry-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 18px;
+      border-top: 1px solid var(--border);
+      gap: 14px;
+      flex-wrap: wrap;
+    }
+    .entry-row:hover { background: #f8fbfd; }
+    .proj-dot {
+      display: inline-block;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      margin-right: 6px;
+    }
+    .tag-pill {
+      background: #eceff1;
+      color: #546e7a;
+      padding: 3px 8px;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+    .btn-icon {
+      background: transparent;
+      border: 1px solid transparent;
+      cursor: pointer;
+      padding: 6px 9px;
+      border-radius: 4px;
+      color: #607d8b;
+      font-size: 0.9rem;
+    }
+    .btn-icon:hover { background: #eceff1; color: #263238; }
+
+    /* CARDS E TABELAS */
+    .white-box {
+      background: var(--bg-white);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 20px;
+      margin-bottom: 20px;
+    }
+    .page-title {
+      font-size: 1.4rem;
+      font-weight: 600;
+      color: #263238;
+      margin-bottom: 18px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    table { width: 100%; border-collapse: collapse; }
+    th, td { padding: 12px 14px; border-bottom: 1px solid var(--border); text-align: left; font-size: 0.88rem; }
+    th { background: #e4eaee; color: #546e7a; font-size: 0.76rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.4px; }
+    tr:hover td { background: #f9fbfd; }
+
+    /* DASHBOARD KPIs & BARS */
+    .kpi-row {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+    .kpi-box {
+      background: #e4eaee;
+      padding: 18px;
+      border-radius: 4px;
+      text-align: center;
+    }
+    .kpi-box .label { font-size: 0.8rem; color: #546e7a; text-transform: uppercase; font-weight: 600; }
+    .kpi-box .val { font-size: 1.8rem; font-weight: 800; color: #263238; margin-top: 6px; }
+
+    .bar-chart { display: flex; flex-direction: column; gap: 12px; margin-top: 14px; }
+    .bar-row { display: flex; align-items: center; gap: 12px; }
+    .bar-label { width: 220px; font-size: 0.88rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .bar-track { flex: 1; height: 22px; background: #eef3f7; border-radius: 4px; overflow: hidden; }
+    .bar-fill { height: 100%; border-radius: 4px; transition: width 0.3s; }
+    .bar-val { width: 130px; text-align: right; font-weight: 700; font-size: 0.88rem; }
+
+    .page-view { display: none; }
+    .page-view.active { display: block; }
+  </style>
+</head>
+<body>
+
+  <!-- TOP HEADER -->
+  <div class="topbar">
+    <div class="logo-wrap">
+      <div class="logo-icon">⏱</div>
+      <span>clockify</span>
+    </div>
+    <div style="display:flex; align-items:center; gap:12px;">
+      <span id="liveWinIndicator" style="font-size:0.8rem; color:var(--text-muted);"></span>
+      <span id="backendBadge" class="workspace-badge" style="background:#e8f5e9; color:#2e7d32; font-weight:700;">☁️ Nuvem Vercel (Online)</span>
+      <span class="workspace-badge">🏢 Espaço de Trabalho — Projetos & Engenharia</span>
+      <button class="btn-mode-toggle" onclick="exportCsv()">📥 Exportar Excel (.CSV)</button>
+    </div>
+  </div>
+
+  <div class="app-layout">
+
+    <!-- SIDEBAR ESTILO CLOCKIFY -->
+    <div class="sidebar">
+      <div class="nav-item active" onclick="openPage('pageTracker', this)">⏱️ Rastreador de Tempo</div>
+      <div class="nav-item" onclick="openPage('pageTimesheet', this)">📅 Planilha de Horas</div>
+
+      <div class="nav-section-label">Analisar</div>
+      <div class="nav-item" onclick="openPage('pageDashboard', this)">📊 Painel</div>
+      <div class="nav-item" onclick="openPage('pageReports', this)">📈 Relatórios</div>
+
+      <div class="nav-section-label">Gerenciar</div>
+      <div class="nav-item" onclick="openPage('pageProjects', this)">📁 Projetos</div>
+      <div class="nav-item" onclick="openPage('pageClients', this)">🏢 Clientes</div>
+      <div class="nav-item" onclick="openPage('pageTeam', this)">👥 Equipe</div>
+      <div class="nav-item" onclick="openPage('pageTags', this)">🏷️ Etiquetas</div>
+      <div class="nav-item" onclick="openPage('pageAutoTracker', this)">🤖 Auto-Rastreador (CAD)</div>
+    </div>
+
+    <!-- MAIN CONTENT -->
+    <div class="main-area">
+
+      <!-- ================================================================== -->
+      <!-- 1. RASTREADOR DE TEMPO (TIME TRACKER)                              -->
+      <!-- ================================================================== -->
+      <div id="pageTracker" class="page-view active">
+
+        <!-- BARRA DE CRONOMETRO / MANUAL -->
+        <div class="tracker-bar">
+          <input type="text" id="trkDesc" class="tracker-input" placeholder="No que você está trabalhando?" />
+
+          <select id="trkProject" style="min-width:190px;"></select>
+          <select id="trkTag" style="min-width:130px;">
+            <option value="">+ Etiqueta</option>
+          </select>
+
+          <button id="trkBillable" class="billable-btn active" onclick="toggleBillable()" title="Faturável ($)">$</button>
+
+          <!-- MODO CRONOMETRO -->
+          <div id="timerControls" style="display:flex; align-items:center; gap:12px;">
+            <div class="clock-display" id="trkClock">00:00:00</div>
+            <button id="btnTimerAction" class="btn-clockify" onclick="toggleTimer()">INICIAR</button>
+          </div>
+
+          <!-- MODO MANUAL -->
+          <div id="manualControls" style="display:none; align-items:center; gap:8px;">
+            <input type="time" id="manStart" value="09:00" />
+            <span>-</span>
+            <input type="time" id="manEnd" value="10:00" />
+            <input type="date" id="manDate" />
+            <button class="btn-clockify" onclick="addManualLog()">ADICIONAR</button>
+          </div>
+
+          <!-- BOTOES ALTERNAR CRONOMETRO / MANUAL -->
+          <div style="display:flex; flex-direction:column; gap:4px;">
+            <button id="btnModeTimer" class="btn-mode-toggle active" onclick="setTrackerMode('TIMER')" title="Modo Cronômetro">⏱</button>
+            <button id="btnModeManual" class="btn-mode-toggle" onclick="setTrackerMode('MANUAL')" title="Modo Manual">☰</button>
+          </div>
+        </div>
+
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; color:#546e7a; font-size:0.88rem; font-weight:600;">
+          <span>Histórico de Apontamentos por Dia</span>
+          <span>Total Geral Acumulado: <strong id="trackerTotalAll" style="color:#263238; font-size:1rem;">00:00:00</strong></span>
+        </div>
+
+        <div id="dayGroupsContainer"></div>
+      </div>
+
+      <!-- ================================================================== -->
+      <!-- 2. PLANILHA DE HORAS (TIMESHEET SEMANAL)                           -->
+      <!-- ================================================================== -->
+      <div id="pageTimesheet" class="page-view">
+        <div class="page-title">
+          <span>Planilha de Horas (Lançamento Rápido por Projeto)</span>
+        </div>
+        <div class="white-box">
+          <p style="font-size:0.88rem; color:var(--text-muted); margin-bottom:16px;">
+            Selecione o Projeto, informe a data e digite as horas para lançar diretamente na planilha:
+          </p>
+          <table>
+            <thead>
+              <tr>
+                <th>Projeto</th>
+                <th>Descrição da Tarefa</th>
+                <th>Data</th>
+                <th>Horas (ex: 2.5 ou 02:30)</th>
+                <th>Total Acumulado no Projeto</th>
+                <th>Ação</th>
+              </tr>
+            </thead>
+            <tbody id="timesheetBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ================================================================== -->
+      <!-- 3. PAINEL (DASHBOARD)                                              -->
+      <!-- ================================================================== -->
+      <div id="pageDashboard" class="page-view">
+        <div class="page-title">
+          <span>Painel de Produtividade e Projetos</span>
+        </div>
+
+        <div class="kpi-row">
+          <div class="kpi-box">
+            <div class="label">Tempo Total</div>
+            <div class="val" id="dashTotalTime">00:00:00</div>
+          </div>
+          <div class="kpi-box">
+            <div class="label">Principal Projeto</div>
+            <div class="val" id="dashTopProject" style="font-size:1.3rem;">-</div>
+          </div>
+          <div class="kpi-box">
+            <div class="label">Valor Faturável (R$)</div>
+            <div class="val" id="dashTotalAmount" style="color:#0288d1;">R$ 0,00</div>
+          </div>
+        </div>
+
+        <div class="white-box">
+          <h3 style="font-size:1rem; color:#546e7a; margin-bottom:12px;">Distribuição de Horas por Projeto</h3>
+          <div id="dashProjectBars" class="bar-chart"></div>
+        </div>
+      </div>
+
+      <!-- ================================================================== -->
+      <!-- 4. RELATÓRIOS (FILTROS + RESUMO + DETALHADO)                       -->
+      <!-- ================================================================== -->
+      <div id="pageReports" class="page-view">
+        <div class="page-title">
+          <span>Relatório de Horas por Projeto e Cliente</span>
+          <a href="/api/export.csv" style="text-decoration:none;">
+            <button class="btn-clockify">📥 Baixar Excel (CSV)</button>
+          </a>
+        </div>
+
+        <!-- BARRA DE FILTROS DO RELATORIO -->
+        <div class="white-box" style="display:flex; gap:12px; flex-wrap:wrap; align-items:center;">
+          <select id="repFilterClient" onchange="renderReports()">
+            <option value="">Todos os Clientes</option>
+          </select>
+          <select id="repFilterProject" onchange="renderReports()">
+            <option value="">Todos os Projetos</option>
+          </select>
+          <input type="date" id="repDateFrom" onchange="renderReports()" title="Data Inicial" />
+          <input type="date" id="repDateTo" onchange="renderReports()" title="Data Final" />
+          <button class="btn-mode-toggle" onclick="clearReportFilters()">Limpar Filtros</button>
+        </div>
+
+        <div class="kpi-row">
+          <div class="kpi-box">
+            <div class="label">Horas Filtradas</div>
+            <div class="val" id="repTotalHours">00:00:00</div>
+          </div>
+          <div class="kpi-box">
+            <div class="label">Horas Faturáveis</div>
+            <div class="val" id="repBillableHours">00:00:00</div>
+          </div>
+          <div class="kpi-box">
+            <div class="label">Valor Total (R$)</div>
+            <div class="val" id="repTotalMoney" style="color:#0288d1;">R$ 0,00</div>
+          </div>
+        </div>
+
+        <div class="white-box">
+          <h3 style="font-size:0.95rem; color:#546e7a; margin-bottom:12px;">Resumo Agrupado por Projeto</h3>
+          <table>
+            <thead>
+              <tr>
+                <th>Projeto</th>
+                <th>Cliente</th>
+                <th>Qtd. Entradas</th>
+                <th>Duração Total</th>
+                <th>Horas (Decimal)</th>
+                <th>Valor (R$)</th>
+              </tr>
+            </thead>
+            <tbody id="repSummaryBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ================================================================== -->
+      <!-- 5. PROJETOS                                                        -->
+      <!-- ================================================================== -->
+      <div id="pageProjects" class="page-view">
+        <div class="page-title">
+          <span>Projetos</span>
+        </div>
+
+        <div class="white-box" style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+          <input type="text" id="newProjName" placeholder="Digite o nome do projeto..." style="flex:1; min-width:220px;" />
+          <input type="text" id="newProjCode" placeholder="Código (ex: PRJ-03)" style="width:140px;" />
+          <select id="newProjClient" style="width:190px;"></select>
+          <input type="color" id="newProjColor" value="#03a9f4" style="width:45px; height:36px; border:none; cursor:pointer;" title="Cor do Projeto" />
+          <input type="number" id="newProjRate" placeholder="Valor/Hora (R$)" style="width:140px;" />
+          <input type="number" id="newProjBudget" placeholder="Estimativa (Horas)" style="width:150px;" />
+          <button class="btn-clockify" onclick="createProject()">CRIAR NOVO PROJETO</button>
+        </div>
+
+        <div class="white-box" style="padding:0;">
+          <table>
+            <thead>
+              <tr>
+                <th>Nome do Projeto</th>
+                <th>Cliente</th>
+                <th>Tempo Rastreado</th>
+                <th>Progresso / Estimativa</th>
+                <th>Valor/Hora</th>
+                <th>Valor Total</th>
+                <th>Ação</th>
+              </tr>
+            </thead>
+            <tbody id="projectsTable"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ================================================================== -->
+      <!-- 6. CLIENTES                                                        -->
+      <!-- ================================================================== -->
+      <div id="pageClients" class="page-view">
+        <div class="page-title"><span>Clientes</span></div>
+        <div class="white-box" style="display:flex; gap:10px;">
+          <input type="text" id="newClientName" placeholder="Adicionar novo cliente..." style="flex:1;" />
+          <input type="email" id="newClientEmail" placeholder="E-mail (opcional)" style="width:240px;" />
+          <button class="btn-clockify" onclick="createClient()">ADICIONAR</button>
+        </div>
+        <div class="white-box" style="padding:0;">
+          <table>
+            <thead>
+              <tr>
+                <th>Nome</th>
+                <th>E-mail</th>
+                <th>Ação</th>
+              </tr>
+            </thead>
+            <tbody id="clientsTable"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ================================================================== -->
+      <!-- 7. EQUIPE                                                          -->
+      <!-- ================================================================== -->
+      <div id="pageTeam" class="page-view">
+        <div class="page-title"><span>Membros da Equipe</span></div>
+        <div class="white-box" style="display:flex; gap:10px;">
+          <input type="text" id="newUserName" placeholder="Nome do colaborador..." style="flex:1;" />
+          <input type="email" id="newUserEmail" placeholder="E-mail" style="width:220px;" />
+          <input type="number" id="newUserRate" placeholder="Valor/Hora (R$)" style="width:150px;" />
+          <button class="btn-clockify" onclick="createUser()">ADICIONAR MEMBRO</button>
+        </div>
+        <div class="white-box" style="padding:0;">
+          <table>
+            <thead>
+              <tr>
+                <th>Nome</th>
+                <th>E-mail</th>
+                <th>Função</th>
+                <th>Taxa Horária (R$)</th>
+              </tr>
+            </thead>
+            <tbody id="usersTable"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ================================================================== -->
+      <!-- 8. ETIQUETAS (TAGS)                                                -->
+      <!-- ================================================================== -->
+      <div id="pageTags" class="page-view">
+        <div class="page-title"><span>Etiquetas</span></div>
+        <div class="white-box" style="display:flex; gap:10px;">
+          <input type="text" id="newTagName" placeholder="Adicionar nova etiqueta (ex: AutoCAD, Revisão, Obra)..." style="flex:1;" />
+          <button class="btn-clockify" onclick="createTag()">ADICIONAR</button>
+        </div>
+        <div class="white-box" style="padding:0;">
+          <table>
+            <thead>
+              <tr>
+                <th>Nome da Etiqueta</th>
+                <th>Ação</th>
+              </tr>
+            </thead>
+            <tbody id="tagsTable"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ================================================================== -->
+      <!-- 9. AUTO-RASTREADOR (AUTO TRACKER DO CLOCKIFY DESKTOP)              -->
+      <!-- ================================================================== -->
+      <div id="pageAutoTracker" class="page-view">
+        <div class="page-title">
+          <span>Auto-Rastreador (Janelas Ativas do Windows / AutoCAD)</span>
+        </div>
+        <div class="white-box">
+          <p style="font-size:0.88rem; color:var(--text-muted); margin-bottom:14px;">
+            Igual ao <strong>Auto Tracker do Clockify</strong>: o sistema grava automaticamente os programas e arquivos (ex.: <code>.dwg</code> do AutoCAD, planilhas, documentos) em que você trabalhou. Clique em <strong>+ Adicionar ao Projeto</strong> para transformar em horas oficiais:
+          </p>
+          <table>
+            <thead>
+              <tr>
+                <th>Programa</th>
+                <th>Título da Janela / Arquivo</th>
+                <th>Início</th>
+                <th>Duração</th>
+                <th>Vincular ao Projeto</th>
+              </tr>
+            </thead>
+            <tbody id="autoTrackerTable"></tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <script>
+    let stateData = {
+      timer: {},
+      clients: [],
+      projects: [],
+      tags: [],
+      users: [],
+      logs: [],
+      auto_events: []
+    };
+    let isBillable = true;
+    let selectsInitialized = false;
+
+    document.getElementById('manDate').valueAsDate = new Date();
+
+    function fmtHMS(sec) {
+      sec = Math.max(0, parseInt(sec || 0, 10));
+      const h = Math.floor(sec / 3600);
+      const m = Math.floor((sec % 3600) / 60);
+      const s = sec % 60;
+      return [h, m, s].map(v => String(v).padStart(2, '0')).join(':');
+    }
+
+    function openPage(pageId, navEl) {
+      document.querySelectorAll('.page-view').forEach(el => el.classList.remove('active'));
+      document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+      document.getElementById(pageId).classList.add('active');
+      navEl.classList.add('active');
+    }
+
+    function setTrackerMode(mode) {
+      document.getElementById('timerControls').style.display = mode === 'TIMER' ? 'flex' : 'none';
+      document.getElementById('manualControls').style.display = mode === 'MANUAL' ? 'flex' : 'none';
+      document.getElementById('btnModeTimer').classList.toggle('active', mode === 'TIMER');
+      document.getElementById('btnModeManual').classList.toggle('active', mode === 'MANUAL');
+    }
+
+    function toggleBillable() {
+      isBillable = !isBillable;
+      document.getElementById('trkBillable').classList.toggle('active', isBillable);
+    }
+
+
+    // =========================================================================
+    // MOTOR HÍBRIDO CLOCKIFY: NUVEM VERCEL (LOCALSTORAGE) + DESKTOP AUTOCAD
+    // =========================================================================
+    let isServerMode = false;
+    let localStoreKey = 'omni_clockify_store_v2';
+
+    const SEED_DATA = {
+      timer: { running: false, elapsed: 0, start_ts: null, description: '', project_id: 1, tag: '', billable: true, current_win_title: '' },
+      clients: [
+        { id: 1, name: "Fortbras / Interno", email: "contato@empresa.com.br", notes: "", status: "ATIVO", created_at: "2026-11-10 12:27:51" },
+        { id: 2, name: "Cliente Engenharia S/A", email: "projetos@cliente.com.br", notes: "", status: "ATIVO", created_at: "2026-11-10 12:27:51" }
+      ],
+      projects: [
+        { id: 1, code: "PRJ-01", name: "Projeto Arquitetônico / AutoCAD", client_id: 2, color: "#03a9f4", billable: 1, hourly_rate: 150.0, budget_hours: 80.0, dwg_pattern: "planta,arq,dwg", status: "ATIVO" },
+        { id: 2, code: "PRJ-02", name: "Detalhamento Executivo", client_id: 2, color: "#8bc34a", billable: 1, hourly_rate: 180.0, budget_hours: 40.0, dwg_pattern: "det,exec", status: "ATIVO" },
+        { id: 3, code: "INT-01", name: "Reuniões e Gestão Interna", client_id: 1, color: "#ff9800", billable: 0, hourly_rate: 0.0, budget_hours: 20.0, dwg_pattern: "", status: "ATIVO" }
+      ],
+      tags: [
+        { id: 1, name: "AutoCAD" },
+        { id: 2, name: "Desenho 2D/3D" },
+        { id: 3, name: "Reunião" },
+        { id: 4, name: "Revisão" },
+        { id: 5, name: "Levantamento" },
+        { id: 6, name: "Urgente" }
+      ],
+      users: [
+        { id: 1, name: "Claudio Guidi", email: "claudioguidi9@gmail.com", role: "Admin", hourly_rate: 150.0 }
+      ],
+      logs: [
+        { id: 1, user_id: 1, project_id: 1, description: "Modelagem das plantas de cobertura e SPDA", tag: "AutoCAD", billable: 1, start_time: "2026-11-11 08:30:00", end_time: "2026-11-11 11:30:00", duration_seconds: 10800, source: "TIMER" },
+        { id: 2, user_id: 1, project_id: 1, description: "Cortes e elevações do galpão industrial", tag: "Desenho 2D/3D", billable: 1, start_time: "2026-11-10 14:00:00", end_time: "2026-11-10 15:00:00", duration_seconds: 3600, source: "MANUAL" },
+        { id: 3, user_id: 1, project_id: 2, description: "Detalhamento de tubagens e travessias", tag: "Revisão", billable: 1, start_time: "2026-11-10 10:00:00", end_time: "2026-11-10 12:00:00", duration_seconds: 7200, source: "TIMER" },
+        { id: 4, user_id: 1, project_id: 3, description: "Alinhamento técnico de proposta comercial OTB", tag: "Reunião", billable: 0, start_time: "2026-11-10 09:00:00", end_time: "2026-11-10 10:00:00", duration_seconds: 3600, source: "MANUAL" }
+      ],
+      auto_events: [
+        { id: 101, window_title: "AutoCAD 2024 - [Planta_SPDA_Cobertura_Rev03.dwg]", dwg_name: "Planta_SPDA_Cobertura_Rev03.dwg", detected_project_id: 1, duration_seconds: 1800, converted_to_log: 0, created_at: "2026-11-11 10:30:00" }
+      ],
+      settings: {
+        autocad_detection_keywords: "autocad,civil 3d,.dwg",
+        idle_threshold_seconds: "180"
+      }
+    };
+
+    function getLocalStore() {
+      try {
+        const raw = localStorage.getItem(localStoreKey);
+        if (raw) return JSON.parse(raw);
+      } catch (e) { console.warn(e); }
+      const init = JSON.parse(JSON.stringify(SEED_DATA));
+      localStorage.setItem(localStoreKey, JSON.stringify(init));
+      return init;
+    }
+
+    function saveLocalStore(data) {
+      try {
+        localStorage.setItem(localStoreKey, JSON.stringify(data));
+      } catch (e) { console.error('Erro ao salvar localstore', e); }
+    }
+
+    function buildDenormalizedState(store) {
+      const clientsMap = {};
+      (store.clients || []).forEach(c => clientsMap[c.id] = c);
+
+      const projectsMap = {};
+      const projSec = {};
+      const projCount = {};
+      (store.logs || []).forEach(l => {
+        projSec[l.project_id] = (projSec[l.project_id] || 0) + (l.duration_seconds || 0);
+        projCount[l.project_id] = (projCount[l.project_id] || 0) + 1;
+      });
+
+      const projects = (store.projects || []).map(p => ({
+        ...p,
+        client_name: clientsMap[p.client_id] ? clientsMap[p.client_id].name : '',
+        total_seconds: projSec[p.id] || 0,
+        entries_count: projCount[p.id] || 0
+      }));
+      projects.forEach(p => projectsMap[p.id] = p);
+
+      const logs = (store.logs || []).map(l => {
+        const prj = projectsMap[l.project_id] || {};
+        return {
+          ...l,
+          project_name: prj.name || 'Sem Projeto',
+          project_code: prj.code || '',
+          project_color: prj.color || '#03a9f4',
+          project_rate: prj.hourly_rate || 0,
+          client_name: prj.client_name || ''
+        };
+      }).sort((a,b) => String(b.start_time || '').localeCompare(String(a.start_time || '')));
+
+      let elapsed = 0;
+      if (store.timer && store.timer.running && store.timer.start_ts) {
+        elapsed = Math.max(0, Math.floor((Date.now() - store.timer.start_ts) / 1000));
+      }
+
+      return {
+        timer: {
+          running: Boolean(store.timer && store.timer.running),
+          elapsed: elapsed,
+          start_ts: store.timer ? store.timer.start_ts : null,
+          description: (store.timer && store.timer.description) || '',
+          project_id: (store.timer && store.timer.project_id) || 1,
+          tag: (store.timer && store.timer.tag) || '',
+          billable: store.timer ? store.timer.billable !== false : true,
+          current_win_title: (store.timer && store.timer.current_win_title) || ''
+        },
+        clients: store.clients || [],
+        projects: projects,
+        tags: store.tags || [],
+        users: store.users || [],
+        logs: logs,
+        auto_events: store.auto_events || [],
+        settings: store.settings || {}
+      };
+    }
+
+    function formatSqlDate(d) {
+      const pad = n => String(n).padStart(2, '0');
+      return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+    }
+
+    async function loadState() {
+      // Tenta carregar do backend local
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 1200);
+        const res = await fetch('/api/state', { signal: controller.signal });
+        clearTimeout(timeoutId);
+        if (res.ok) {
+          const data = await res.json();
+          if (data && data.projects) {
+            isServerMode = true;
+            stateData = data;
+            const badge = document.getElementById('backendBadge');
+            if (badge) {
+              badge.textContent = '🖥️ Servidor Local AutoCAD (Conectado)';
+              badge.style.background = '#e3f2fd';
+              badge.style.color = '#1565c0';
+            }
+            renderUI();
+            return;
+          }
+        }
+      } catch (e) {
+        // Modo local fallback
+      }
+
+      isServerMode = false;
+      const badge = document.getElementById('backendBadge');
+      if (badge) {
+        badge.textContent = '☁️ Nuvem Vercel (Online)';
+        badge.style.background = '#e8f5e9';
+        badge.style.color = '#2e7d32';
+      }
+      const store = getLocalStore();
+      stateData = buildDenormalizedState(store);
+      renderUI();
+    }
+
+    async function toggleTimer() {
+      const projId = parseInt(document.getElementById('trkProject').value, 10) || 1;
+      const desc = document.getElementById('trkDesc').value || '';
+      const tag = document.getElementById('trkTag').value || '';
+      const bill = isBillable;
+
+      if (isServerMode) {
+        const payload = { project_id: projId, description: desc, tag: tag, billable: bill };
+        if (stateData.timer.running) {
+          await fetch('/api/timer/stop', { method: 'POST', body: JSON.stringify(payload) });
+          document.getElementById('trkDesc').value = '';
+        } else {
+          await fetch('/api/timer/start', { method: 'POST', body: JSON.stringify(payload) });
+        }
+        loadState();
+        return;
+      }
+
+      // Em modo local
+      const store = getLocalStore();
+      if (store.timer && store.timer.running) {
+        const now = new Date();
+        const startTs = store.timer.start_ts || (now.getTime() - 60000);
+        const durSec = Math.max(1, Math.floor((now.getTime() - startTs) / 1000));
+        const newLog = {
+          id: Date.now(),
+          user_id: 1,
+          project_id: store.timer.project_id || projId,
+          description: store.timer.description || desc || 'Tarefa cronometrada',
+          tag: store.timer.tag || tag || '',
+          billable: store.timer.billable !== false ? 1 : 0,
+          start_time: formatSqlDate(new Date(startTs)),
+          end_time: formatSqlDate(now),
+          duration_seconds: durSec,
+          source: 'TIMER'
+        };
+        store.logs.unshift(newLog);
+        store.timer = { running: false, elapsed: 0, start_ts: null, description: '', project_id: projId, tag: '', billable: bill, current_win_title: '' };
+        saveLocalStore(store);
+        document.getElementById('trkDesc').value = '';
+      } else {
+        store.timer = {
+          running: true,
+          elapsed: 0,
+          start_ts: Date.now(),
+          description: desc,
+          project_id: projId,
+          tag: tag,
+          billable: bill,
+          current_win_title: 'Nuvem Vercel Web Tracker'
+        };
+        saveLocalStore(store);
+      }
+      loadState();
+    }
+
+    async function continueEntry(project_id, description, tag, billable) {
+      document.getElementById('trkProject').value = project_id;
+      document.getElementById('trkDesc').value = description;
+      document.getElementById('trkTag').value = tag;
+      isBillable = Boolean(billable);
+      document.getElementById('trkBillable').classList.toggle('active', isBillable);
+
+      if (isServerMode) {
+        await fetch('/api/timer/start', {
+          method: 'POST',
+          body: JSON.stringify({ project_id, description, tag, billable: isBillable })
+        });
+        loadState();
+        return;
+      }
+
+      const store = getLocalStore();
+      store.timer = {
+        running: true,
+        elapsed: 0,
+        start_ts: Date.now(),
+        description: description,
+        project_id: parseInt(project_id, 10),
+        tag: tag,
+        billable: isBillable,
+        current_win_title: 'Nuvem Vercel Web Tracker'
+      };
+      saveLocalStore(store);
+      loadState();
+    }
+
+    async function addManualLog() {
+      const projId = parseInt(document.getElementById('trkProject').value, 10) || 1;
+      const desc = document.getElementById('trkDesc').value || 'Apontamento Manual';
+      const tag = document.getElementById('trkTag').value || '';
+      const startHm = document.getElementById('manStart').value || '09:00';
+      const endHm = document.getElementById('manEnd').value || '10:00';
+      const dateStr = document.getElementById('manDate').value || new Date().toISOString().substring(0, 10);
+
+      if (isServerMode) {
+        const payload = {
+          project_id: projId,
+          description: desc,
+          tag: tag,
+          billable: isBillable,
+          start_hm: startHm,
+          end_hm: endHm,
+          date: dateStr
+        };
+        await fetch('/api/logs/add', { method: 'POST', body: JSON.stringify(payload) });
+        document.getElementById('trkDesc').value = '';
+        loadState();
+        return;
+      }
+
+      const [sh, sm] = startHm.split(':').map(Number);
+      const [eh, em] = endHm.split(':').map(Number);
+      const sec = Math.max(60, ((eh * 60 + em) - (sh * 60 + sm)) * 60);
+
+      const store = getLocalStore();
+      const newLog = {
+        id: Date.now(),
+        user_id: 1,
+        project_id: projId,
+        description: desc,
+        tag: tag,
+        billable: isBillable ? 1 : 0,
+        start_time: `${dateStr} ${startHm}:00`,
+        end_time: `${dateStr} ${endHm}:00`,
+        duration_seconds: sec,
+        source: 'MANUAL'
+      };
+      store.logs.unshift(newLog);
+      saveLocalStore(store);
+      document.getElementById('trkDesc').value = '';
+      loadState();
+    }
+
+    async function saveTimesheetRow(projectId) {
+      const desc = document.getElementById(`tsDesc_${projectId}`).value || 'Planilha de Horas';
+      const date = document.getElementById(`tsDate_${projectId}`).value;
+      const hrs = parseFloat(document.getElementById(`tsHrs_${projectId}`).value || '0');
+      if (hrs <= 0) {
+        alert('Informe a quantidade de horas!');
+        return;
+      }
+
+      if (isServerMode) {
+        await fetch('/api/logs/add', {
+          method: 'POST',
+          body: JSON.stringify({
+            project_id: projectId,
+            description: desc,
+            date: date,
+            duration_seconds: Math.round(hrs * 3600),
+            billable: true
+          })
+        });
+        loadState();
+        return;
+      }
+
+      const store = getLocalStore();
+      const sec = Math.round(hrs * 3600);
+      const newLog = {
+        id: Date.now(),
+        user_id: 1,
+        project_id: parseInt(projectId, 10),
+        description: desc,
+        tag: 'Timesheet',
+        billable: 1,
+        start_time: `${date} 09:00:00`,
+        end_time: `${date} ${String(9 + Math.floor(hrs)).padStart(2,'0')}:00:00`,
+        duration_seconds: sec,
+        source: 'TIMESHEET'
+      };
+      store.logs.unshift(newLog);
+      saveLocalStore(store);
+      loadState();
+    }
+
+    async function deleteLog(id) {
+      if (isServerMode) {
+        await fetch('/api/logs/delete', { method: 'POST', body: JSON.stringify({ id }) });
+        loadState();
+        return;
+      }
+      const store = getLocalStore();
+      store.logs = store.logs.filter(l => l.id != id);
+      saveLocalStore(store);
+      loadState();
+    }
+
+    async function createProject() {
+      const name = document.getElementById('newProjName').value;
+      if (!name) return alert('Digite o nome do projeto!');
+      const code = document.getElementById('newProjCode').value || `PRJ-${String(Date.now()).slice(-3)}`;
+      const clientId = parseInt(document.getElementById('newProjClient').value, 10) || null;
+      const color = document.getElementById('newProjColor').value || '#03a9f4';
+      const rate = parseFloat(document.getElementById('newProjRate').value || '150');
+      const budget = parseFloat(document.getElementById('newProjBudget').value || '0');
+
+      if (isServerMode) {
+        await fetch('/api/projects/add', {
+          method: 'POST',
+          body: JSON.stringify({
+            name, code, client_id: clientId, color,
+            hourly_rate: rate, budget_hours: budget, billable: true
+          })
+        });
+      } else {
+        const store = getLocalStore();
+        const maxId = store.projects.reduce((m, p) => Math.max(m, p.id || 0), 0);
+        store.projects.push({
+          id: maxId + 1,
+          code, name, client_id: clientId, color,
+          hourly_rate: rate, budget_hours: budget,
+          billable: 1, dwg_pattern: '', status: 'ATIVO'
+        });
+        saveLocalStore(store);
+      }
+      document.getElementById('newProjName').value = '';
+      document.getElementById('newProjCode').value = '';
+      loadState();
+    }
+
+    async function deleteProject(id) {
+      if (!confirm('Excluir este projeto?')) return;
+      if (isServerMode) {
+        await fetch('/api/projects/delete', { method: 'POST', body: JSON.stringify({ id }) });
+      } else {
+        const store = getLocalStore();
+        store.projects = store.projects.filter(p => p.id != id);
+        saveLocalStore(store);
+      }
+      loadState();
+    }
+
+    async function createClient() {
+      const name = document.getElementById('newClientName').value;
+      if (!name) return;
+      const email = document.getElementById('newClientEmail').value || '';
+
+      if (isServerMode) {
+        await fetch('/api/clients/add', { method: 'POST', body: JSON.stringify({ name, email }) });
+      } else {
+        const store = getLocalStore();
+        const maxId = store.clients.reduce((m, c) => Math.max(m, c.id || 0), 0);
+        store.clients.push({ id: maxId + 1, name, email, notes: '', status: 'ATIVO', created_at: formatSqlDate(new Date()) });
+        saveLocalStore(store);
+      }
+      document.getElementById('newClientName').value = '';
+      document.getElementById('newClientEmail').value = '';
+      loadState();
+    }
+
+    async function deleteClient(id) {
+      if (isServerMode) {
+        await fetch('/api/clients/delete', { method: 'POST', body: JSON.stringify({ id }) });
+      } else {
+        const store = getLocalStore();
+        store.clients = store.clients.filter(c => c.id != id);
+        saveLocalStore(store);
+      }
+      loadState();
+    }
+
+    async function createUser() {
+      const name = document.getElementById('newUserName').value;
+      if (!name) return;
+      const email = document.getElementById('newUserEmail').value || '';
+      const rate = parseFloat(document.getElementById('newUserRate').value || '150');
+
+      if (isServerMode) {
+        await fetch('/api/users/add', { method: 'POST', body: JSON.stringify({ name, email, hourly_rate: rate }) });
+      } else {
+        const store = getLocalStore();
+        const maxId = store.users.reduce((m, u) => Math.max(m, u.id || 0), 0);
+        store.users.push({ id: maxId + 1, name, email, role: 'Membro', hourly_rate: rate });
+        saveLocalStore(store);
+      }
+      document.getElementById('newUserName').value = '';
+      loadState();
+    }
+
+    async function createTag() {
+      const name = document.getElementById('newTagName').value;
+      if (!name) return;
+
+      if (isServerMode) {
+        await fetch('/api/tags/add', { method: 'POST', body: JSON.stringify({ name }) });
+      } else {
+        const store = getLocalStore();
+        const maxId = store.tags.reduce((m, t) => Math.max(m, t.id || 0), 0);
+        store.tags.push({ id: maxId + 1, name });
+        saveLocalStore(store);
+      }
+      document.getElementById('newTagName').value = '';
+      loadState();
+    }
+
+    async function deleteTag(id) {
+      if (isServerMode) {
+        await fetch('/api/tags/delete', { method: 'POST', body: JSON.stringify({ id }) });
+      } else {
+        const store = getLocalStore();
+        store.tags = store.tags.filter(t => t.id != id);
+        saveLocalStore(store);
+      }
+      loadState();
+    }
+
+    async function convertAutoEvent(evId) {
+      const projId = parseInt(document.getElementById(`autoProj_${evId}`).value, 10);
+      if (isServerMode) {
+        await fetch('/api/autotracker/convert', { method: 'POST', body: JSON.stringify({ event_id: evId, project_id: projId }) });
+      } else {
+        const store = getLocalStore();
+        const ev = store.auto_events.find(e => e.id == evId);
+        if (ev) {
+          ev.converted_to_log = 1;
+          const newLog = {
+            id: Date.now(),
+            user_id: 1,
+            project_id: projId,
+            description: `Auto-CAD: ${ev.dwg_name || ev.window_title}`,
+            tag: 'AutoCAD',
+            billable: 1,
+            start_time: ev.created_at || formatSqlDate(new Date()),
+            end_time: formatSqlDate(new Date()),
+            duration_seconds: ev.duration_seconds || 1800,
+            source: 'AUTOCAD'
+          };
+          store.logs.unshift(newLog);
+          saveLocalStore(store);
+        }
+      }
+      loadState();
+    }
+
+    function exportCsv() {
+      if (isServerMode) {
+        window.location.href = '/api/export.csv';
+        return;
+      }
+      // Gerador dinâmico de CSV no cliente
+      const logs = (stateData && stateData.logs) || [];
+      const headers = ["ID", "Usuário", "Projeto", "Código Projeto", "Cliente", "Descrição", "Etiqueta", "Faturável", "Início", "Fim", "Duração (s)", "Duração (hh:mm:ss)", "Origem"];
+      const rows = logs.map(l => [
+        l.id,
+        "Claudio Guidi",
+        `"${(l.project_name || '').replace(/"/g, '""')}"`,
+        `"${(l.project_code || '').replace(/"/g, '""')}"`,
+        `"${(l.client_name || '').replace(/"/g, '""')}"`,
+        `"${(l.description || '').replace(/"/g, '""')}"`,
+        `"${(l.tag || '').replace(/"/g, '""')}"`,
+        l.billable ? "SIM" : "NÃO",
+        l.start_time || '',
+        l.end_time || '',
+        l.duration_seconds || 0,
+        fmtHMS(l.duration_seconds),
+        l.source || 'MANUAL'
+      ]);
+
+      const csvContent = "\uFEFF" + [headers.join(';')].concat(rows.map(r => r.join(';'))).join('\r\n');
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `clockify_apontamentos_${new Date().toISOString().substring(0, 10)}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+
+    loadState();
+    setInterval(loadState, 3000);
+    setInterval(() => {
+      if (stateData && stateData.timer && stateData.timer.running) {
+        stateData.timer.elapsed = (stateData.timer.elapsed || 0) + 1;
+        const el = document.getElementById('trkClock');
+        if (el) el.textContent = fmtHMS(stateData.timer.elapsed);
+      }
+    }, 1000);
+  </script>
+</body>
+</html>
