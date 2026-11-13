@@ -138,10 +138,17 @@ def init_db():
         if cur.execute("SELECT COUNT(*) AS c FROM users").fetchone()["c"] == 0:
             cur.execute("INSERT INTO users (name, email, role, hourly_rate) VALUES (?, '', 'Admin', 150.0)", (default_user,))
 
+        # Se for um banco antigo antes da confirmacao do Auto-Rastreador, inicia desligado ate o usuario confirmar
+        has_confirmed_key = cur.execute("SELECT value FROM settings WHERE key='auto_tracker_confirmed'").fetchone()
+        if not has_confirmed_key:
+            cur.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('auto_tracker_enabled', '0')")
+            cur.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('auto_tracker_confirmed', '0')")
+
         default_settings = {
             "user_name": default_user,
             "idle_timeout_seconds": "300",
-            "auto_tracker_enabled": "1"
+            "auto_tracker_enabled": "0",
+            "auto_tracker_confirmed": "0"
         }
         for k, v in default_settings.items():
             cur.execute("INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)", (k, v))
@@ -211,6 +218,19 @@ class ActiveTimerState:
 timer_state = ActiveTimerState()
 
 
+def detect_app_name(win_title):
+    low = (win_title or "").lower()
+    if "autocad" in low or ".dwg" in low or "civil 3d" in low or "autodesk" in low:
+        return "AutoCAD"
+    if "revit" in low or ".rvt" in low:
+        return "Revit"
+    if "excel" in low or ".xlsx" in low or ".csv" in low:
+        return "Excel"
+    if " - " in win_title:
+        return win_title.split(" - ")[-1].strip() or "Aplicativo"
+    return "Aplicativo"
+
+
 def background_worker():
     while True:
         time.sleep(2)
@@ -222,6 +242,15 @@ def background_worker():
             with db_lock:
                 conn = get_db()
                 cur = conn.cursor()
+
+                en_row = cur.execute("SELECT value FROM settings WHERE key='auto_tracker_enabled'").fetchone()
+                auto_enabled = (en_row["value"] == "1") if en_row else False
+
+                idle_row = cur.execute("SELECT value FROM settings WHERE key='idle_timeout_seconds'").fetchone()
+                try:
+                    idle_limit = int(idle_row["value"]) if idle_row and idle_row["value"] else 300
+                except Exception:
+                    idle_limit = 300
 
                 with timer_state.lock:
                     timer_state.idle_seconds = idle_sec
@@ -235,9 +264,10 @@ def background_worker():
                             WHERE id = ?
                         """, (now_str, elapsed, timer_state.log_id))
 
-                    # 2. Auto-Tracker (grava em segundo plano as janelas usadas: AutoCAD, Excel, etc.)
-                    if win_title and idle_sec < 300 and "Clockify" not in win_title:
-                        app_guess = win_title.split(" - ")[-1] if " - " in win_title else "Aplicativo"
+                    # 2. Auto-Tracker: grava em segundo plano SOMENTE se estiver ativado pelo usuario
+                    is_own_panel = ("Clockify —" in win_title) or ("localhost:8765" in win_title) or ("omni-clockify" in win_title.lower())
+                    if auto_enabled and win_title and idle_sec < idle_limit and not is_own_panel:
+                        app_guess = detect_app_name(win_title)
                         if timer_state.current_win_title == win_title and timer_state.current_win_id:
                             cur.execute("""
                                 UPDATE auto_tracker_events
@@ -269,9 +299,21 @@ class ClockifyHandler(BaseHTTPRequestHandler):
     def log_message(self, format, *args):
         pass
 
+    def _send_cors_headers(self):
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type")
+        self.send_header("Access-Control-Allow-Private-Network", "true")
+
+    def do_OPTIONS(self):
+        self.send_response(204)
+        self._send_cors_headers()
+        self.end_headers()
+
     def _send_json(self, data, status=200):
         body = json.dumps(data, ensure_ascii=False).encode("utf-8")
         self.send_response(status)
+        self._send_cors_headers()
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Cache-Control", "no-store")
         self.send_header("Content-Length", str(len(body)))
@@ -328,7 +370,7 @@ class ClockifyHandler(BaseHTTPRequestHandler):
 
                 auto_events = [dict(r) for r in cur.execute("""
                     SELECT * FROM auto_tracker_events
-                    WHERE duration_seconds >= 6
+                    WHERE duration_seconds >= 2
                     ORDER BY id DESC
                     LIMIT 80
                 """).fetchall()]
@@ -336,6 +378,7 @@ class ClockifyHandler(BaseHTTPRequestHandler):
                 settings = {r["key"]: r["value"] for r in cur.execute("SELECT key, value FROM settings").fetchall()}
                 conn.close()
 
+            auto_enabled = (settings.get("auto_tracker_enabled") == "1")
             with timer_state.lock:
                 elapsed = max(0, int(time.time() - timer_state.start_ts)) if timer_state.running and timer_state.start_ts else 0
                 timer = {
@@ -346,8 +389,9 @@ class ClockifyHandler(BaseHTTPRequestHandler):
                     "tag": timer_state.tag,
                     "billable": timer_state.billable,
                     "elapsed": elapsed,
-                    "current_win_title": timer_state.current_win_title,
+                    "current_win_title": timer_state.current_win_title if auto_enabled else "",
                     "idle_seconds": timer_state.idle_seconds,
+                    "auto_tracker_enabled": auto_enabled,
                 }
 
             self._send_json({
@@ -391,6 +435,7 @@ class ClockifyHandler(BaseHTTPRequestHandler):
                 )
             csv_bytes = ("\ufeff" + "\r\n".join(lines)).encode("utf-8")
             self.send_response(200)
+            self._send_cors_headers()
             self.send_header("Content-Type", "text/csv; charset=utf-8")
             self.send_header("Content-Disposition", 'attachment; filename="clockify_relatorio_horas.csv"')
             self.send_header("Content-Length", str(len(csv_bytes)))
@@ -604,6 +649,34 @@ class ClockifyHandler(BaseHTTPRequestHandler):
             self._send_json({"ok": True})
             return
 
+        if path == "/api/autotracker/toggle":
+            enabled = bool(data.get("enabled", True))
+            val = "1" if enabled else "0"
+            with db_lock:
+                conn = get_db()
+                conn.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('auto_tracker_enabled', ?)", (val,))
+                conn.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('auto_tracker_confirmed', '1')")
+                conn.commit()
+                conn.close()
+
+            if not enabled:
+                with timer_state.lock:
+                    timer_state.current_win_title = ""
+                    timer_state.current_win_id = None
+
+            self._send_json({"ok": True, "auto_tracker_enabled": val})
+            return
+
+        if path == "/api/autotracker/delete":
+            ev_id = int(data.get("event_id") or 0)
+            with db_lock:
+                conn = get_db()
+                conn.execute("DELETE FROM auto_tracker_events WHERE id = ?", (ev_id,))
+                conn.commit()
+                conn.close()
+            self._send_json({"ok": True})
+            return
+
         if path == "/api/autotracker/convert":
             # Converte um evento automatico (ex: janela do AutoCAD) em apontamento oficial de projeto
             ev_id = int(data.get("event_id") or 0)
@@ -630,17 +703,25 @@ class ClockifyHandler(BaseHTTPRequestHandler):
 
 def main():
     init_db()
+    with db_lock:
+        conn = get_db()
+        row = conn.execute("SELECT value FROM settings WHERE key='auto_tracker_enabled'").fetchone()
+        is_auto_on = (row["value"] == "1") if row else False
+        conn.close()
+
     t = threading.Thread(target=background_worker, daemon=True)
     t.start()
 
     server = HTTPServer(("0.0.0.0", PORT), ClockifyHandler)
-    url = f"http://localhost:{PORT}"
+    base_url = f"http://localhost:{PORT}"
+    open_url = base_url if is_auto_on else f"{base_url}/#autotracker"
     print("=" * 65)
     print("  CLOCKIFY PRO (PT-BR) - CONTROLE DE HORAS E PROJETOS")
-    print(f"  Acesse no navegador: {url}")
+    print(f"  Acesse no navegador: {base_url}")
+    print(f"  Auto-Rastreador: {'ATIVO (LIGADO)' if is_auto_on else 'AGUARDANDO START NO PAINEL'}")
     print("=" * 65)
 
-    threading.Timer(1.0, lambda: webbrowser.open(url)).start()
+    threading.Timer(1.0, lambda: webbrowser.open(open_url)).start()
     try:
         server.serve_forever()
     except KeyboardInterrupt:

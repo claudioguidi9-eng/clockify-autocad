@@ -279,6 +279,138 @@
 
     .page-view { display: none; }
     .page-view.active { display: block; }
+
+    /* AUTO-RASTREADOR HERO & MODAL DE CONFIRMACAO */
+    .autotracker-hero {
+      background: var(--bg-white);
+      border: 1px solid var(--border);
+      border-left: 5px solid #90a4ae;
+      border-radius: 6px;
+      padding: 20px 24px;
+      margin-bottom: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+      flex-wrap: wrap;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+      transition: 0.2s;
+    }
+    .autotracker-hero.is-active {
+      border-left-color: var(--clockify-green);
+      background: linear-gradient(90deg, #f1f8e9 0%, #ffffff 45%);
+    }
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 5px 12px;
+      border-radius: 99px;
+      font-size: 0.78rem;
+      font-weight: 800;
+      letter-spacing: 0.4px;
+      text-transform: uppercase;
+      margin-bottom: 8px;
+    }
+    .status-pill.off {
+      background: #eceff1;
+      color: #546e7a;
+    }
+    .status-pill.on {
+      background: #e8f5e9;
+      color: #2e7d32;
+      border: 1px solid #a5d6a7;
+    }
+    .pulse-dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      background: #43a047;
+      box-shadow: 0 0 0 0 rgba(67, 160, 71, 0.7);
+      animation: pulseGreen 1.6s infinite;
+    }
+    @keyframes pulseGreen {
+      0% { box-shadow: 0 0 0 0 rgba(67, 160, 71, 0.65); }
+      70% { box-shadow: 0 0 0 8px rgba(67, 160, 71, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(67, 160, 71, 0); }
+    }
+    .btn-start-autotracker {
+      background: var(--clockify-green);
+      color: #fff;
+      border: none;
+      padding: 14px 28px;
+      font-weight: 800;
+      font-size: 0.92rem;
+      letter-spacing: 0.5px;
+      border-radius: 6px;
+      cursor: pointer;
+      text-transform: uppercase;
+      box-shadow: 0 3px 10px rgba(76, 175, 80, 0.3);
+      transition: 0.15s;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .btn-start-autotracker:hover {
+      background: #388e3c;
+      transform: translateY(-1px);
+    }
+    .btn-stop-autotracker {
+      background: #fff;
+      color: #d32f2f;
+      border: 1px solid #ef9a9a;
+      padding: 10px 18px;
+      font-weight: 700;
+      font-size: 0.82rem;
+      border-radius: 6px;
+      cursor: pointer;
+      text-transform: uppercase;
+      transition: 0.15s;
+    }
+    .btn-stop-autotracker:hover {
+      background: #ffebee;
+      border-color: #d32f2f;
+    }
+
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(38, 50, 56, 0.55);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 999;
+      padding: 16px;
+    }
+    .modal-backdrop.open { display: flex; }
+    .modal-card {
+      background: #fff;
+      border-radius: 8px;
+      max-width: 460px;
+      width: 100%;
+      padding: 26px 28px;
+      box-shadow: 0 12px 36px rgba(0,0,0,0.22);
+      border-top: 5px solid var(--clockify-blue);
+    }
+    .modal-card h3 {
+      font-size: 1.2rem;
+      color: #263238;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .modal-card p {
+      font-size: 0.92rem;
+      color: #546e7a;
+      line-height: 1.5;
+      margin-bottom: 22px;
+    }
+    .modal-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+    }
   </style>
 </head>
 <body>
@@ -313,7 +445,10 @@
       <div class="nav-item" onclick="openPage('pageClients', this)">🏢 Clientes</div>
       <div class="nav-item" onclick="openPage('pageTeam', this)">👥 Equipe</div>
       <div class="nav-item" onclick="openPage('pageTags', this)">🏷️ Etiquetas</div>
-      <div class="nav-item" onclick="openPage('pageAutoTracker', this)">🤖 Auto-Rastreador (CAD)</div>
+      <div id="navAutoTracker" class="nav-item" onclick="openPage('pageAutoTracker', this)">
+        <span>🤖 Auto-Rastreador (CAD)</span>
+        <span id="navAutoDot" style="margin-left:auto; font-size:0.72rem; display:none;" title="Auto-Rastreador Ligado">🟢</span>
+      </div>
     </div>
 
     <!-- MAIN CONTENT -->
@@ -427,9 +562,7 @@
       <div id="pageReports" class="page-view">
         <div class="page-title">
           <span>Relatório de Horas por Projeto e Cliente</span>
-          <a href="/api/export.csv" style="text-decoration:none;">
-            <button class="btn-clockify">📥 Baixar Excel (CSV)</button>
-          </a>
+          <button class="btn-clockify" onclick="exportCsv()">📥 Baixar Excel (CSV)</button>
         </div>
 
         <!-- BARRA DE FILTROS DO RELATORIO -->
@@ -591,11 +724,34 @@
       <!-- ================================================================== -->
       <div id="pageAutoTracker" class="page-view">
         <div class="page-title">
-          <span>Auto-Rastreador (Janelas Ativas do Windows / AutoCAD)</span>
+          <span>🤖 Auto-Rastreador (Janelas Ativas do Windows / AutoCAD)</span>
         </div>
+
+        <!-- PAINEL START / STATUS DO AUTO-RASTREADOR -->
+        <div id="autoTrackerHero" class="autotracker-hero">
+          <div style="flex:1; min-width:260px;">
+            <div id="autoTrackerStatusPill" class="status-pill off">⚪ DESATIVADO</div>
+            <div id="autoTrackerHeroTitle" style="font-size:1.1rem; font-weight:700; color:#263238; margin-bottom:6px;">
+              Auto-Rastreador Aguardando Início
+            </div>
+            <div id="autoTrackerHeroDesc" style="font-size:0.88rem; color:#546e7a; line-height:1.45;">
+              Clique em <strong>START (INICIAR AUTO-RASTREADOR)</strong> para ativar o monitoramento automático das janelas do Windows e arquivos <code>.dwg</code> do AutoCAD.
+            </div>
+            <div id="autoTrackerLiveWindow" style="display:none; margin-top:10px; font-size:0.84rem; color:#1565c0; background:#e3f2fd; padding:6px 12px; border-radius:4px; font-weight:600;"></div>
+          </div>
+          <div id="autoTrackerActionWrap" style="display:flex; align-items:center; gap:12px;">
+            <button id="btnStartAutoTracker" class="btn-start-autotracker" onclick="openAutoTrackerConfirmModal()">
+              ▶ START — INICIAR AUTO-RASTREADOR
+            </button>
+            <button id="btnStopAutoTracker" class="btn-stop-autotracker" style="display:none;" onclick="deactivateAutoTracker()">
+              ⏹ Desativar
+            </button>
+          </div>
+        </div>
+
         <div class="white-box">
           <p style="font-size:0.88rem; color:var(--text-muted); margin-bottom:14px;">
-            Igual ao <strong>Auto Tracker do Clockify</strong>: o sistema grava automaticamente os programas e arquivos (ex.: <code>.dwg</code> do AutoCAD, planilhas, documentos) em que você trabalhou. Clique em <strong>+ Adicionar ao Projeto</strong> para transformar em horas oficiais:
+            Igual ao <strong>Auto Tracker do Clockify</strong>: quando ligado, o sistema grava automaticamente os programas e arquivos (ex.: <code>.dwg</code> do AutoCAD, planilhas, documentos) em que você trabalhou. Clique em <strong>+ Adicionar</strong> para transformar em horas oficiais do projeto:
           </p>
           <table>
             <thead>
@@ -615,6 +771,20 @@
     </div>
   </div>
 
+  <!-- MODAL DE CONFIRMACAO DO AUTO-RASTREADOR -->
+  <div id="autoTrackerModal" class="modal-backdrop" onclick="if(event.target===this) closeAutoTrackerConfirmModal()">
+    <div class="modal-card">
+      <h3>🤖 Deseja deixar o Auto-Rastreador ativo?</h3>
+      <p>
+        Ao confirmar, o <strong>Auto-Rastreador</strong> será iniciado agora e ficará <strong>ligado continuamente</strong> em segundo plano, registrando automaticamente os desenhos do AutoCAD (<code>.dwg</code>) e janelas ativas para seus apontamentos.
+      </p>
+      <div class="modal-actions">
+        <button class="btn-mode-toggle" style="padding:10px 18px; font-size:0.85rem;" onclick="closeAutoTrackerConfirmModal()">Cancelar</button>
+        <button class="btn-start-autotracker" style="padding:10px 20px; font-size:0.85rem;" onclick="confirmStartAutoTracker()">✓ Sim, confirmar e manter ligado</button>
+      </div>
+    </div>
+  </div>
+
   <script>
     let stateData = {
       timer: {},
@@ -623,10 +793,13 @@
       tags: [],
       users: [],
       logs: [],
-      auto_events: []
+      auto_events: [],
+      settings: {}
     };
     let isBillable = true;
-    let selectsInitialized = false;
+    let isServerMode = false;
+    let API_BASE = '';
+    let localStoreKey = 'omni_clockify_store_v2';
 
     document.getElementById('manDate').valueAsDate = new Date();
 
@@ -638,11 +811,21 @@
       return [h, m, s].map(v => String(v).padStart(2, '0')).join(':');
     }
 
+    function escHtml(s) {
+      return String(s || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
     function openPage(pageId, navEl) {
       document.querySelectorAll('.page-view').forEach(el => el.classList.remove('active'));
       document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
-      document.getElementById(pageId).classList.add('active');
-      navEl.classList.add('active');
+      const target = document.getElementById(pageId);
+      if (target) target.classList.add('active');
+      if (navEl) navEl.classList.add('active');
     }
 
     function setTrackerMode(mode) {
@@ -657,15 +840,62 @@
       document.getElementById('trkBillable').classList.toggle('active', isBillable);
     }
 
+    // =========================================================================
+    // MODAL & CONTROLE DO AUTO-RASTREADOR (START -> CONFIRMAR -> MANTER LIGADO)
+    // =========================================================================
+    function openAutoTrackerConfirmModal() {
+      document.getElementById('autoTrackerModal').classList.add('open');
+    }
+
+    function closeAutoTrackerConfirmModal() {
+      document.getElementById('autoTrackerModal').classList.remove('open');
+    }
+
+    function isAutoTrackerActive() {
+      if (stateData && stateData.timer && typeof stateData.timer.auto_tracker_enabled === 'boolean') {
+        return stateData.timer.auto_tracker_enabled;
+      }
+      if (stateData && stateData.settings) {
+        return String(stateData.settings.auto_tracker_enabled) === '1';
+      }
+      return false;
+    }
+
+    async function confirmStartAutoTracker() {
+      closeAutoTrackerConfirmModal();
+
+      // Persiste também no navegador para manter ligado mesmo recarregando
+      const store = getLocalStore();
+      store.settings = store.settings || {};
+      store.settings.auto_tracker_enabled = '1';
+      store.settings.auto_tracker_confirmed = '1';
+      saveLocalStore(store);
+
+      if (isServerMode) {
+        await apiPost('/api/autotracker/toggle', { enabled: true });
+      }
+
+      await loadState();
+    }
+
+    async function deactivateAutoTracker() {
+      const store = getLocalStore();
+      store.settings = store.settings || {};
+      store.settings.auto_tracker_enabled = '0';
+      saveLocalStore(store);
+
+      if (isServerMode) {
+        await apiPost('/api/autotracker/toggle', { enabled: false });
+      }
+
+      await loadState();
+    }
 
     // =========================================================================
     // MOTOR HÍBRIDO CLOCKIFY: NUVEM VERCEL (LOCALSTORAGE) + DESKTOP AUTOCAD
     // =========================================================================
-    let isServerMode = false;
-    let localStoreKey = 'omni_clockify_store_v2';
-
     const SEED_DATA = {
-      timer: { running: false, elapsed: 0, start_ts: null, description: '', project_id: 1, tag: '', billable: true, current_win_title: '' },
+      timer: { running: false, elapsed: 0, start_ts: null, description: '', project_id: 1, tag: '', billable: true, current_win_title: '', auto_tracker_enabled: false },
       clients: [
         { id: 1, name: "Fortbras / Interno", email: "contato@empresa.com.br", notes: "", status: "ATIVO", created_at: "2026-11-10 12:27:51" },
         { id: 2, name: "Cliente Engenharia S/A", email: "projetos@cliente.com.br", notes: "", status: "ATIVO", created_at: "2026-11-10 12:27:51" }
@@ -693,18 +923,27 @@
         { id: 4, user_id: 1, project_id: 3, description: "Alinhamento técnico de proposta comercial OTB", tag: "Reunião", billable: 0, start_time: "2026-11-10 09:00:00", end_time: "2026-11-10 10:00:00", duration_seconds: 3600, source: "MANUAL" }
       ],
       auto_events: [
-        { id: 101, window_title: "AutoCAD 2024 - [Planta_SPDA_Cobertura_Rev03.dwg]", dwg_name: "Planta_SPDA_Cobertura_Rev03.dwg", detected_project_id: 1, duration_seconds: 1800, converted_to_log: 0, created_at: "2026-11-11 10:30:00" }
+        { id: 101, app_name: "AutoCAD", window_title: "AutoCAD 2024 - [Planta_SPDA_Cobertura_Rev03.dwg]", dwg_name: "Planta_SPDA_Cobertura_Rev03.dwg", detected_project_id: 1, duration_seconds: 1800, converted_to_log: 0, start_time: "2026-11-11 10:30:00", created_at: "2026-11-11 10:30:00" }
       ],
       settings: {
         autocad_detection_keywords: "autocad,civil 3d,.dwg",
-        idle_threshold_seconds: "180"
+        idle_threshold_seconds: "180",
+        auto_tracker_enabled: "0",
+        auto_tracker_confirmed: "0"
       }
     };
 
     function getLocalStore() {
       try {
         const raw = localStorage.getItem(localStoreKey);
-        if (raw) return JSON.parse(raw);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          parsed.settings = parsed.settings || {};
+          if (typeof parsed.settings.auto_tracker_enabled === 'undefined') {
+            parsed.settings.auto_tracker_enabled = '0';
+          }
+          return parsed;
+        }
       } catch (e) { console.warn(e); }
       const init = JSON.parse(JSON.stringify(SEED_DATA));
       localStorage.setItem(localStoreKey, JSON.stringify(init));
@@ -754,6 +993,9 @@
         elapsed = Math.max(0, Math.floor((Date.now() - store.timer.start_ts) / 1000));
       }
 
+      const settings = store.settings || {};
+      const autoOn = String(settings.auto_tracker_enabled) === '1';
+
       return {
         timer: {
           running: Boolean(store.timer && store.timer.running),
@@ -763,15 +1005,16 @@
           project_id: (store.timer && store.timer.project_id) || 1,
           tag: (store.timer && store.timer.tag) || '',
           billable: store.timer ? store.timer.billable !== false : true,
-          current_win_title: (store.timer && store.timer.current_win_title) || ''
+          current_win_title: autoOn ? ((store.timer && store.timer.current_win_title) || '') : '',
+          auto_tracker_enabled: autoOn
         },
         clients: store.clients || [],
         projects: projects,
         tags: store.tags || [],
         users: store.users || [],
         logs: logs,
-        auto_events: store.auto_events || [],
-        settings: store.settings || {}
+        auto_events: (store.auto_events || []).filter(ev => !ev.converted_to_log),
+        settings: settings
       };
     }
 
@@ -780,17 +1023,29 @@
       return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
     }
 
+    async function apiPost(endpoint, payload) {
+      return fetch(`${API_BASE}${endpoint}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload || {})
+      });
+    }
+
     async function loadState() {
-      // Tenta carregar do backend local
+      const isLocalHost = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+      const candidateBase = isLocalHost ? '' : 'http://127.0.0.1:8765';
+
       try {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 1200);
-        const res = await fetch('/api/state', { signal: controller.signal });
+        const timeoutId = setTimeout(() => controller.abort(), 900);
+        const res = await fetch(`${candidateBase}/api/state`, { signal: controller.signal });
         clearTimeout(timeoutId);
-        if (res.ok) {
+        const ct = res.headers.get('content-type') || '';
+        if (res.ok && ct.includes('application/json')) {
           const data = await res.json();
-          if (data && data.projects) {
+          if (data && Array.isArray(data.projects)) {
             isServerMode = true;
+            API_BASE = candidateBase;
             stateData = data;
             const badge = document.getElementById('backendBadge');
             if (badge) {
@@ -803,10 +1058,11 @@
           }
         }
       } catch (e) {
-        // Modo local fallback
+        // Sem servidor local rodando: usa armazenamento nuvem/navegador
       }
 
       isServerMode = false;
+      API_BASE = '';
       const badge = document.getElementById('backendBadge');
       if (badge) {
         badge.textContent = '☁️ Nuvem Vercel (Online)';
@@ -818,6 +1074,388 @@
       renderUI();
     }
 
+    function renderUI() {
+      const { timer, clients, projects, tags, users, logs, auto_events } = stateData;
+      const autoActive = isAutoTrackerActive();
+
+      // Indicador discreto no topo + ponto verde na barra lateral
+      const navDot = document.getElementById('navAutoDot');
+      if (navDot) navDot.style.display = autoActive ? 'inline' : 'none';
+
+      const liveInd = document.getElementById('liveWinIndicator');
+      if (liveInd) {
+        if (autoActive && timer.current_win_title) {
+          liveInd.textContent = `🟢 Auto-Rastreador: ${timer.current_win_title.substring(0, 44)}`;
+          liveInd.style.color = '#2e7d32';
+          liveInd.style.fontWeight = '700';
+        } else if (autoActive) {
+          liveInd.textContent = '🟢 Auto-Rastreador Ativo';
+          liveInd.style.color = '#2e7d32';
+          liveInd.style.fontWeight = '700';
+        } else {
+          liveInd.textContent = '';
+        }
+      }
+
+      // Painel Hero do Auto-Rastreador
+      const hero = document.getElementById('autoTrackerHero');
+      const pill = document.getElementById('autoTrackerStatusPill');
+      const heroTitle = document.getElementById('autoTrackerHeroTitle');
+      const heroDesc = document.getElementById('autoTrackerHeroDesc');
+      const liveWinBox = document.getElementById('autoTrackerLiveWindow');
+      const btnStart = document.getElementById('btnStartAutoTracker');
+      const btnStop = document.getElementById('btnStopAutoTracker');
+
+      if (hero && pill && btnStart && btnStop) {
+        if (autoActive) {
+          hero.classList.add('is-active');
+          pill.className = 'status-pill on';
+          pill.innerHTML = '<span class="pulse-dot"></span> ATIVO — LIGADO CONTINUAMENTE';
+          heroTitle.textContent = 'Auto-Rastreador em Execução';
+          if (isServerMode) {
+            heroDesc.innerHTML = 'O monitoramento automático está <strong>ligado</strong> e registrando em segundo plano as janelas ativas do Windows e arquivos <code>.dwg</code> do AutoCAD.';
+          } else {
+            heroDesc.innerHTML = 'O Auto-Rastreador está <strong>ligado</strong>! Para capturar janelas do Windows e arquivos <code>.dwg</code> do AutoCAD em tempo real no PC, basta manter o <code>Iniciar_ClockIn.bat</code> aberto.';
+          }
+          if (timer.current_win_title) {
+            liveWinBox.style.display = 'inline-block';
+            liveWinBox.textContent = `🖥️ Detectando agora: ${timer.current_win_title}`;
+          } else {
+            liveWinBox.style.display = 'none';
+          }
+          btnStart.style.display = 'none';
+          btnStop.style.display = 'inline-block';
+        } else {
+          hero.classList.remove('is-active');
+          pill.className = 'status-pill off';
+          pill.textContent = '⚪ DESATIVADO';
+          heroTitle.textContent = 'Auto-Rastreador Aguardando Início';
+          heroDesc.innerHTML = 'Clique em <strong>START — INICIAR AUTO-RASTREADOR</strong> ao lado para ativar e manter o monitoramento automático ligado.';
+          liveWinBox.style.display = 'none';
+          btnStart.style.display = 'inline-flex';
+          btnStop.style.display = 'none';
+        }
+      }
+
+      // Atualiza selects mantendo valor selecionado (sem sobrescrever quando focado)
+      const projSelectIds = ['trkProject', 'repFilterProject'];
+      projSelectIds.forEach(id => {
+        const el = document.getElementById(id);
+        if (!el || document.activeElement === el) return;
+        const old = el.value;
+        const prefix = id === 'repFilterProject' ? '<option value="">Todos os Projetos</option>' : '';
+        el.innerHTML = prefix + projects.map(p => `<option value="${p.id}">● ${escHtml(p.name)} (${escHtml(p.client_name || 'Sem cliente')})</option>`).join('');
+        if (old) el.value = old;
+      });
+
+      const tagEl = document.getElementById('trkTag');
+      if (tagEl && document.activeElement !== tagEl) {
+        const oldTag = tagEl.value;
+        tagEl.innerHTML = '<option value="">+ Etiqueta</option>' + tags.map(t => `<option value="${escHtml(t.name)}">${escHtml(t.name)}</option>`).join('');
+        if (oldTag) tagEl.value = oldTag;
+      }
+
+      const cliIds = ['newProjClient', 'repFilterClient'];
+      cliIds.forEach(id => {
+        const el = document.getElementById(id);
+        if (!el || document.activeElement === el) return;
+        const old = el.value;
+        const prefix = id === 'repFilterClient' ? '<option value="">Todos os Clientes</option>' : '';
+        el.innerHTML = prefix + clients.map(c => `<option value="${c.id}">${escHtml(c.name)}</option>`).join('');
+        if (old) el.value = old;
+      });
+
+      // Atualiza Barra do Cronometro
+      const btnAct = document.getElementById('btnTimerAction');
+      if (timer.running) {
+        btnAct.textContent = 'PARAR';
+        btnAct.classList.add('stop');
+        document.getElementById('trkClock').textContent = fmtHMS(timer.elapsed);
+        const descInput = document.getElementById('trkDesc');
+        if (descInput && !descInput.value && timer.description && document.activeElement !== descInput) {
+          descInput.value = timer.description;
+        }
+      } else {
+        btnAct.textContent = 'INICIAR';
+        btnAct.classList.remove('stop');
+        document.getElementById('trkClock').textContent = '00:00:00';
+      }
+
+      // 1. Renderiza Grupos por Dia no Rastreador de Tempo
+      const groups = {};
+      let totalAllSec = 0;
+      logs.forEach(l => {
+        const day = (l.start_time || '').substring(0, 10) || 'Hoje';
+        if (!groups[day]) groups[day] = { total: 0, items: [] };
+        groups[day].total += (l.duration_seconds || 0);
+        totalAllSec += (l.duration_seconds || 0);
+        groups[day].items.push(l);
+      });
+
+      document.getElementById('trackerTotalAll').textContent = fmtHMS(totalAllSec);
+
+      const container = document.getElementById('dayGroupsContainer');
+      container.innerHTML = Object.keys(groups).map(day => {
+        const g = groups[day];
+        const rowsHtml = g.items.map(item => {
+          const safeDescJs = String(item.description || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+          const safeTagJs = String(item.tag || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+          return `
+            <div class="entry-row">
+              <div style="display:flex; align-items:center; gap:12px; flex:1; min-width:260px;">
+                <strong style="color:#263238;">${escHtml(item.description || '(Sem descrição)')}</strong>
+                <span style="font-weight:600; font-size:0.86rem; color:${escHtml(item.project_color || '#03a9f4')};">
+                  <span class="proj-dot" style="background:${escHtml(item.project_color || '#03a9f4')};"></span>
+                  ${escHtml(item.project_name || 'Sem Projeto')}
+                </span>
+                ${item.client_name ? `<span style="color:var(--text-muted); font-size:0.82rem;">— ${escHtml(item.client_name)}</span>` : ''}
+                ${item.tag ? `<span class="tag-pill">🏷️ ${escHtml(item.tag)}</span>` : ''}
+              </div>
+              <div style="display:flex; align-items:center; gap:14px;">
+                <span style="font-weight:700; color:${item.billable ? '#03a9f4' : '#cfd8dc'};" title="Faturável">$</span>
+                <span style="color:var(--text-muted); font-size:0.82rem;">
+                  ${escHtml((item.start_time || '').substring(11, 16))} - ${escHtml((item.end_time || '').substring(11, 16))}
+                </span>
+                <strong style="font-size:1rem; font-variant-numeric:tabular-nums; min-width:75px; text-align:right;">
+                  ${fmtHMS(item.duration_seconds)}
+                </strong>
+                <button class="btn-icon" title="Continuar esta tarefa (Play)" onclick="continueEntry(${item.project_id || 1}, '${safeDescJs}', '${safeTagJs}', ${Boolean(item.billable)})">▶</button>
+                <button class="btn-icon" title="Excluir" onclick="deleteLog(${item.id})">🗑️</button>
+              </div>
+            </div>
+          `;
+        }).join('');
+
+        return `
+          <div class="day-group">
+            <div class="day-header">
+              <span>📅 Data: ${escHtml(day)}</span>
+              <span>Total do Dia: <strong style="color:#263238;">${fmtHMS(g.total)}</strong></span>
+            </div>
+            ${rowsHtml}
+          </div>
+        `;
+      }).join('');
+
+      // 2. Renderiza Planilha de Horas (Timesheet) preservando digitacao em andamento
+      const tsBody = document.getElementById('timesheetBody');
+      if (tsBody && !tsBody.contains(document.activeElement)) {
+        const savedTs = {};
+        projects.forEach(p => {
+          const dEl = document.getElementById(`tsDesc_${p.id}`);
+          const dtEl = document.getElementById(`tsDate_${p.id}`);
+          const hEl = document.getElementById(`tsHrs_${p.id}`);
+          if (dEl || dtEl || hEl) {
+            savedTs[p.id] = {
+              desc: dEl ? dEl.value : '',
+              date: dtEl ? dtEl.value : '',
+              hrs: hEl ? hEl.value : ''
+            };
+          }
+        });
+        const todayIso = new Date().toISOString().substring(0, 10);
+        tsBody.innerHTML = projects.map(p => {
+          const prev = savedTs[p.id] || {};
+          return `
+            <tr>
+              <td><span class="proj-dot" style="background:${escHtml(p.color)};"></span><strong>${escHtml(p.name)}</strong></td>
+              <td><input type="text" id="tsDesc_${p.id}" value="${escHtml(prev.desc || '')}" placeholder="Atividade realizada..." style="width:100%;" /></td>
+              <td><input type="date" id="tsDate_${p.id}" value="${escHtml(prev.date || todayIso)}" /></td>
+              <td><input type="number" id="tsHrs_${p.id}" value="${escHtml(prev.hrs || '')}" placeholder="Ex: 2.5" step="0.25" min="0" style="width:120px;" /></td>
+              <td><strong>${fmtHMS(p.total_seconds)}</strong></td>
+              <td><button class="btn-clockify" style="padding:7px 14px;" onclick="saveTimesheetRow(${p.id})">+ Lançar</button></td>
+            </tr>
+          `;
+        }).join('');
+      }
+
+      // 3. Renderiza Dashboard
+      let totalBillableMoney = 0;
+      let topProj = '-';
+      let maxProjSec = 0;
+      projects.forEach(p => {
+        if (p.billable) {
+          totalBillableMoney += ((p.total_seconds || 0) / 3600.0) * (p.hourly_rate || 0);
+        }
+        if ((p.total_seconds || 0) > maxProjSec) {
+          maxProjSec = p.total_seconds;
+          topProj = p.name;
+        }
+      });
+      document.getElementById('dashTotalTime').textContent = fmtHMS(totalAllSec);
+      document.getElementById('dashTopProject').textContent = topProj;
+      document.getElementById('dashTotalAmount').textContent = totalBillableMoney.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+      document.getElementById('dashProjectBars').innerHTML = projects.map(p => {
+        const pct = totalAllSec > 0 ? Math.round(((p.total_seconds || 0) / totalAllSec) * 100) : 0;
+        return `
+          <div class="bar-row">
+            <div class="bar-label"><span class="proj-dot" style="background:${escHtml(p.color)};"></span>${escHtml(p.name)}</div>
+            <div class="bar-track"><div class="bar-fill" style="width:${pct}%; background:${escHtml(p.color)};"></div></div>
+            <div class="bar-val">${fmtHMS(p.total_seconds)} (${pct}%)</div>
+          </div>
+        `;
+      }).join('');
+
+      // 4. Renderiza Relatorios
+      renderReports();
+
+      // 5. Renderiza Tabela de Projetos
+      document.getElementById('projectsTable').innerHTML = projects.map(p => {
+        const hrs = (p.total_seconds || 0) / 3600.0;
+        const budget = p.budget_hours || 0;
+        const pct = budget > 0 ? Math.min(100, Math.round((hrs / budget) * 100)) : 0;
+        const val = hrs * (p.hourly_rate || 0);
+        return `
+          <tr>
+            <td><span class="proj-dot" style="background:${escHtml(p.color)};"></span><strong>${escHtml(p.name)}</strong> ${p.code ? `<small style="color:var(--text-muted);">[${escHtml(p.code)}]</small>` : ''}</td>
+            <td>${escHtml(p.client_name || '-')}</td>
+            <td><strong>${fmtHMS(p.total_seconds)}</strong> (${hrs.toFixed(2)}h)</td>
+            <td>${budget > 0 ? `${hrs.toFixed(1)} / ${budget}h (${pct}%)` : 'Sem limite'}</td>
+            <td>R$ ${(p.hourly_rate || 0).toFixed(2)}</td>
+            <td><strong>${val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</strong></td>
+            <td><button class="btn-icon" onclick="deleteProject(${p.id})">🗑️</button></td>
+          </tr>
+        `;
+      }).join('');
+
+      // 6. Clientes, Equipe, Tags, Auto-Tracker
+      document.getElementById('clientsTable').innerHTML = clients.map(c => `
+        <tr>
+          <td><strong>${escHtml(c.name)}</strong></td>
+          <td>${escHtml(c.email || '-')}</td>
+          <td><button class="btn-icon" onclick="deleteClient(${c.id})">🗑️</button></td>
+        </tr>
+      `).join('');
+
+      document.getElementById('usersTable').innerHTML = users.map(u => `
+        <tr>
+          <td><strong>${escHtml(u.name)}</strong></td>
+          <td>${escHtml(u.email || '-')}</td>
+          <td>${escHtml(u.role)}</td>
+          <td>R$ ${(u.hourly_rate || 0).toFixed(2)}/h</td>
+        </tr>
+      `).join('');
+
+      document.getElementById('tagsTable').innerHTML = tags.map(t => `
+        <tr>
+          <td><span class="tag-pill">🏷️ ${escHtml(t.name)}</span></td>
+          <td><button class="btn-icon" onclick="deleteTag(${t.id})">🗑️</button></td>
+        </tr>
+      `).join('');
+
+      const autoTbl = document.getElementById('autoTrackerTable');
+      if (autoTbl && !autoTbl.contains(document.activeElement)) {
+        const savedAutoSel = {};
+        (auto_events || []).forEach(ev => {
+          const sel = document.getElementById(`autoProj_${ev.id}`);
+          if (sel) savedAutoSel[ev.id] = sel.value;
+        });
+
+        const visibleEvents = (auto_events || []).filter(ev => !ev.converted_to_log);
+        if (visibleEvents.length === 0) {
+          autoTbl.innerHTML = `
+            <tr>
+              <td colspan="5" style="text-align:center; padding:26px; color:var(--text-muted);">
+                ${autoActive
+                  ? '🟢 Auto-Rastreador ativo! Assim que você alternar para o AutoCAD (.dwg) ou outras janelas no PC, os registros aparecerão aqui automaticamente.'
+                  : '⚪ Nenhum evento pendente. Clique em <strong>START — INICIAR AUTO-RASTREADOR</strong> acima para começar a monitorar.'}
+              </td>
+            </tr>
+          `;
+        } else {
+          autoTbl.innerHTML = visibleEvents.map(ev => {
+            const appName = ev.app_name || (String(ev.window_title || '').toLowerCase().includes('autocad') ? 'AutoCAD' : 'Aplicativo');
+            const startTime = ev.start_time || ev.created_at || '-';
+            const preferredProj = savedAutoSel[ev.id] || ev.detected_project_id || (projects[0] ? projects[0].id : 1);
+            const projOpts = projects.map(p => `<option value="${p.id}" ${String(p.id) === String(preferredProj) ? 'selected' : ''}>${escHtml(p.name)}</option>`).join('');
+            return `
+              <tr>
+                <td><strong>${escHtml(appName)}</strong></td>
+                <td>${escHtml(ev.window_title)}</td>
+                <td>${escHtml(startTime)}</td>
+                <td><strong>${fmtHMS(ev.duration_seconds)}</strong></td>
+                <td style="display:flex; gap:8px; align-items:center;">
+                  <select id="autoProj_${ev.id}">${projOpts}</select>
+                  <button class="btn-clockify" style="padding:6px 12px;" onclick="convertAutoEvent(${ev.id})">+ Adicionar</button>
+                </td>
+              </tr>
+            `;
+          }).join('');
+        }
+      }
+    }
+
+    function renderReports() {
+      const { logs, projects } = stateData;
+      const fClient = document.getElementById('repFilterClient').value;
+      const fProj = document.getElementById('repFilterProject').value;
+      const fFrom = document.getElementById('repDateFrom').value;
+      const fTo = document.getElementById('repDateTo').value;
+
+      const filtered = (logs || []).filter(l => {
+        const proj = (projects || []).find(p => p.id === l.project_id);
+        if (fProj && String(l.project_id) !== String(fProj)) return false;
+        if (fClient && proj && String(proj.client_id) !== String(fClient)) return false;
+        const d = (l.start_time || '').substring(0, 10);
+        if (fFrom && d < fFrom) return false;
+        if (fTo && d > fTo) return false;
+        return true;
+      });
+
+      let totSec = 0, billSec = 0, totMoney = 0;
+      const byProj = {};
+
+      filtered.forEach(l => {
+        const s = l.duration_seconds || 0;
+        totSec += s;
+        if (l.billable) {
+          billSec += s;
+          totMoney += (s / 3600.0) * (l.project_rate || 0);
+        }
+        const pid = l.project_id || 0;
+        if (!byProj[pid]) {
+          byProj[pid] = {
+            name: l.project_name || 'Sem Projeto',
+            color: l.project_color || '#03a9f4',
+            client: l.client_name || '-',
+            rate: l.project_rate || 0,
+            count: 0,
+            sec: 0
+          };
+        }
+        byProj[pid].count++;
+        byProj[pid].sec += s;
+      });
+
+      document.getElementById('repTotalHours').textContent = fmtHMS(totSec);
+      document.getElementById('repBillableHours').textContent = fmtHMS(billSec);
+      document.getElementById('repTotalMoney').textContent = totMoney.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+      document.getElementById('repSummaryBody').innerHTML = Object.values(byProj).map(g => {
+        const hrs = g.sec / 3600.0;
+        const val = hrs * g.rate;
+        return `
+          <tr>
+            <td><span class="proj-dot" style="background:${escHtml(g.color)};"></span><strong>${escHtml(g.name)}</strong></td>
+            <td>${escHtml(g.client)}</td>
+            <td>${g.count}</td>
+            <td><strong>${fmtHMS(g.sec)}</strong></td>
+            <td>${hrs.toFixed(2)} h</td>
+            <td><strong>${val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</strong></td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function clearReportFilters() {
+      document.getElementById('repFilterClient').value = '';
+      document.getElementById('repFilterProject').value = '';
+      document.getElementById('repDateFrom').value = '';
+      document.getElementById('repDateTo').value = '';
+      renderReports();
+    }
+
     async function toggleTimer() {
       const projId = parseInt(document.getElementById('trkProject').value, 10) || 1;
       const desc = document.getElementById('trkDesc').value || '';
@@ -827,16 +1465,15 @@
       if (isServerMode) {
         const payload = { project_id: projId, description: desc, tag: tag, billable: bill };
         if (stateData.timer.running) {
-          await fetch('/api/timer/stop', { method: 'POST', body: JSON.stringify(payload) });
+          await apiPost('/api/timer/stop', payload);
           document.getElementById('trkDesc').value = '';
         } else {
-          await fetch('/api/timer/start', { method: 'POST', body: JSON.stringify(payload) });
+          await apiPost('/api/timer/start', payload);
         }
         loadState();
         return;
       }
 
-      // Em modo local
       const store = getLocalStore();
       if (store.timer && store.timer.running) {
         const now = new Date();
@@ -867,7 +1504,7 @@
           project_id: projId,
           tag: tag,
           billable: bill,
-          current_win_title: 'Nuvem Vercel Web Tracker'
+          current_win_title: ''
         };
         saveLocalStore(store);
       }
@@ -882,10 +1519,7 @@
       document.getElementById('trkBillable').classList.toggle('active', isBillable);
 
       if (isServerMode) {
-        await fetch('/api/timer/start', {
-          method: 'POST',
-          body: JSON.stringify({ project_id, description, tag, billable: isBillable })
-        });
+        await apiPost('/api/timer/start', { project_id, description, tag, billable: isBillable });
         loadState();
         return;
       }
@@ -899,7 +1533,7 @@
         project_id: parseInt(project_id, 10),
         tag: tag,
         billable: isBillable,
-        current_win_title: 'Nuvem Vercel Web Tracker'
+        current_win_title: ''
       };
       saveLocalStore(store);
       loadState();
@@ -914,7 +1548,7 @@
       const dateStr = document.getElementById('manDate').value || new Date().toISOString().substring(0, 10);
 
       if (isServerMode) {
-        const payload = {
+        await apiPost('/api/logs/add', {
           project_id: projId,
           description: desc,
           tag: tag,
@@ -922,8 +1556,7 @@
           start_hm: startHm,
           end_hm: endHm,
           date: dateStr
-        };
-        await fetch('/api/logs/add', { method: 'POST', body: JSON.stringify(payload) });
+        });
         document.getElementById('trkDesc').value = '';
         loadState();
         return;
@@ -931,7 +1564,9 @@
 
       const [sh, sm] = startHm.split(':').map(Number);
       const [eh, em] = endHm.split(':').map(Number);
-      const sec = Math.max(60, ((eh * 60 + em) - (sh * 60 + sm)) * 60);
+      let diffMin = (eh * 60 + em) - (sh * 60 + sm);
+      if (diffMin <= 0) diffMin += 24 * 60;
+      const sec = Math.max(60, diffMin * 60);
 
       const store = getLocalStore();
       const newLog = {
@@ -955,29 +1590,37 @@
     async function saveTimesheetRow(projectId) {
       const desc = document.getElementById(`tsDesc_${projectId}`).value || 'Planilha de Horas';
       const date = document.getElementById(`tsDate_${projectId}`).value;
-      const hrs = parseFloat(document.getElementById(`tsHrs_${projectId}`).value || '0');
-      if (hrs <= 0) {
+      const rawHrs = String(document.getElementById(`tsHrs_${projectId}`).value || '0').replace(',', '.');
+      let hrs = 0;
+      if (rawHrs.includes(':')) {
+        const [h, m] = rawHrs.split(':').map(Number);
+        hrs = (h || 0) + ((m || 0) / 60);
+      } else {
+        hrs = parseFloat(rawHrs || '0');
+      }
+      if (!hrs || hrs <= 0) {
         alert('Informe a quantidade de horas!');
         return;
       }
 
       if (isServerMode) {
-        await fetch('/api/logs/add', {
-          method: 'POST',
-          body: JSON.stringify({
-            project_id: projectId,
-            description: desc,
-            date: date,
-            duration_seconds: Math.round(hrs * 3600),
-            billable: true
-          })
+        await apiPost('/api/logs/add', {
+          project_id: projectId,
+          description: desc,
+          date: date,
+          duration_seconds: Math.round(hrs * 3600),
+          billable: true
         });
+        document.getElementById(`tsDesc_${projectId}`).value = '';
+        document.getElementById(`tsHrs_${projectId}`).value = '';
         loadState();
         return;
       }
 
       const store = getLocalStore();
       const sec = Math.round(hrs * 3600);
+      const endHour = Math.min(23, 9 + Math.floor(hrs));
+      const endMin = Math.round((hrs % 1) * 60);
       const newLog = {
         id: Date.now(),
         user_id: 1,
@@ -986,18 +1629,20 @@
         tag: 'Timesheet',
         billable: 1,
         start_time: `${date} 09:00:00`,
-        end_time: `${date} ${String(9 + Math.floor(hrs)).padStart(2,'0')}:00:00`,
+        end_time: `${date} ${String(endHour).padStart(2,'0')}:${String(endMin).padStart(2,'0')}:00`,
         duration_seconds: sec,
         source: 'TIMESHEET'
       };
       store.logs.unshift(newLog);
       saveLocalStore(store);
+      document.getElementById(`tsDesc_${projectId}`).value = '';
+      document.getElementById(`tsHrs_${projectId}`).value = '';
       loadState();
     }
 
     async function deleteLog(id) {
       if (isServerMode) {
-        await fetch('/api/logs/delete', { method: 'POST', body: JSON.stringify({ id }) });
+        await apiPost('/api/logs/delete', { id });
         loadState();
         return;
       }
@@ -1017,12 +1662,9 @@
       const budget = parseFloat(document.getElementById('newProjBudget').value || '0');
 
       if (isServerMode) {
-        await fetch('/api/projects/add', {
-          method: 'POST',
-          body: JSON.stringify({
-            name, code, client_id: clientId, color,
-            hourly_rate: rate, budget_hours: budget, billable: true
-          })
+        await apiPost('/api/projects/add', {
+          name, code, client_id: clientId, color,
+          hourly_rate: rate, budget_hours: budget, billable: true
         });
       } else {
         const store = getLocalStore();
@@ -1043,7 +1685,7 @@
     async function deleteProject(id) {
       if (!confirm('Excluir este projeto?')) return;
       if (isServerMode) {
-        await fetch('/api/projects/delete', { method: 'POST', body: JSON.stringify({ id }) });
+        await apiPost('/api/projects/delete', { id });
       } else {
         const store = getLocalStore();
         store.projects = store.projects.filter(p => p.id != id);
@@ -1058,7 +1700,7 @@
       const email = document.getElementById('newClientEmail').value || '';
 
       if (isServerMode) {
-        await fetch('/api/clients/add', { method: 'POST', body: JSON.stringify({ name, email }) });
+        await apiPost('/api/clients/add', { name, email });
       } else {
         const store = getLocalStore();
         const maxId = store.clients.reduce((m, c) => Math.max(m, c.id || 0), 0);
@@ -1072,7 +1714,7 @@
 
     async function deleteClient(id) {
       if (isServerMode) {
-        await fetch('/api/clients/delete', { method: 'POST', body: JSON.stringify({ id }) });
+        await apiPost('/api/clients/delete', { id });
       } else {
         const store = getLocalStore();
         store.clients = store.clients.filter(c => c.id != id);
@@ -1088,7 +1730,7 @@
       const rate = parseFloat(document.getElementById('newUserRate').value || '150');
 
       if (isServerMode) {
-        await fetch('/api/users/add', { method: 'POST', body: JSON.stringify({ name, email, hourly_rate: rate }) });
+        await apiPost('/api/users/add', { name, email, hourly_rate: rate });
       } else {
         const store = getLocalStore();
         const maxId = store.users.reduce((m, u) => Math.max(m, u.id || 0), 0);
@@ -1104,7 +1746,7 @@
       if (!name) return;
 
       if (isServerMode) {
-        await fetch('/api/tags/add', { method: 'POST', body: JSON.stringify({ name }) });
+        await apiPost('/api/tags/add', { name });
       } else {
         const store = getLocalStore();
         const maxId = store.tags.reduce((m, t) => Math.max(m, t.id || 0), 0);
@@ -1117,7 +1759,7 @@
 
     async function deleteTag(id) {
       if (isServerMode) {
-        await fetch('/api/tags/delete', { method: 'POST', body: JSON.stringify({ id }) });
+        await apiPost('/api/tags/delete', { id });
       } else {
         const store = getLocalStore();
         store.tags = store.tags.filter(t => t.id != id);
@@ -1129,7 +1771,7 @@
     async function convertAutoEvent(evId) {
       const projId = parseInt(document.getElementById(`autoProj_${evId}`).value, 10);
       if (isServerMode) {
-        await fetch('/api/autotracker/convert', { method: 'POST', body: JSON.stringify({ event_id: evId, project_id: projId }) });
+        await apiPost('/api/autotracker/convert', { event_id: evId, project_id: projId });
       } else {
         const store = getLocalStore();
         const ev = store.auto_events.find(e => e.id == evId);
@@ -1142,7 +1784,7 @@
             description: `Auto-CAD: ${ev.dwg_name || ev.window_title}`,
             tag: 'AutoCAD',
             billable: 1,
-            start_time: ev.created_at || formatSqlDate(new Date()),
+            start_time: ev.start_time || ev.created_at || formatSqlDate(new Date()),
             end_time: formatSqlDate(new Date()),
             duration_seconds: ev.duration_seconds || 1800,
             source: 'AUTOCAD'
@@ -1156,10 +1798,9 @@
 
     function exportCsv() {
       if (isServerMode) {
-        window.location.href = '/api/export.csv';
+        window.location.href = `${API_BASE}/api/export.csv`;
         return;
       }
-      // Gerador dinâmico de CSV no cliente
       const logs = (stateData && stateData.logs) || [];
       const headers = ["ID", "Usuário", "Projeto", "Código Projeto", "Cliente", "Descrição", "Etiqueta", "Faturável", "Início", "Fim", "Duração (s)", "Duração (hh:mm:ss)", "Origem"];
       const rows = logs.map(l => [
@@ -1188,6 +1829,10 @@
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
+    }
+
+    if (window.location.hash === '#autotracker') {
+      openPage('pageAutoTracker', document.getElementById('navAutoTracker'));
     }
 
     loadState();

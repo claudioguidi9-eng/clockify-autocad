@@ -41,5 +41,6 @@ Acesse a aplicação diretamente pelo navegador. Todos os dados, cronômetros e 
 
 ### 2. Operação Local com Auto-Rastreador AutoCAD
 1. Execute o arquivo `Iniciar_ClockIn.bat` (ou execute `python server.py`).
-2. O servidor local iniciará na porta `5050` e abrirá o painel no navegador padrão.
-3. O painel conectará automaticamente ao banco local SQLite (`clockify_local.db`).
+2. O servidor local iniciará na porta `8765` e abrirá o painel no navegador padrão.
+3. Na aba **🤖 Auto-Rastreador (CAD)**, clique em **START — INICIAR AUTO-RASTREADOR** e confirme **"Deseja deixar o Auto-Rastreador ativo?"** para iniciar e mantê-lo ligado continuamente.
+
